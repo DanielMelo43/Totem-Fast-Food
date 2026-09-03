@@ -1,0 +1,55 @@
+services:
+  database:
+    image: postgres:17-bookworm
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-smashgo}
+      POSTGRES_USER: ${POSTGRES_USER:-smashgo}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Defina POSTGRES_PASSWORD no arquivo .env}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - smashgo_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-smashgo} -d ${POSTGRES_DB:-smashgo}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+    networks:
+      - smashgo_internal
+
+  backend:
+    build:
+      context: ./backend
+    environment:
+      APP_ENV: production
+      DATABASE_URL: postgresql://${POSTGRES_USER:-smashgo}:${POSTGRES_PASSWORD}@database:5432/${POSTGRES_DB:-smashgo}
+      ADMIN_USERNAME: ${ADMIN_USERNAME:-admin}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:?Defina ADMIN_PASSWORD no arquivo .env}
+      CPF_ENCRYPTION_KEY: ${CPF_ENCRYPTION_KEY:?Defina CPF_ENCRYPTION_KEY no arquivo .env}
+      ALLOWED_ORIGINS: http://localhost:${FRONTEND_PORT:-8080}
+    depends_on:
+      database:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - smashgo_internal
+
+  frontend:
+    build:
+      context: ./frontend
+    ports:
+      - "${FRONTEND_PORT:-8080}:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - smashgo_internal
+
+volumes:
+  smashgo_postgres_data:
+
+networks:
+  smashgo_internal:
+    driver: bridge
