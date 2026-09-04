@@ -2,10 +2,12 @@ import logging
 import secrets
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
+from pathlib import Path
 
 from fastapi import Depends, FastAPI, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse, JSONResponse
 from psycopg.errors import UniqueViolation
 
 from .config import settings
@@ -16,6 +18,7 @@ from .security import authenticate, check_login_limit, clear_login_attempts, cli
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
 logger = logging.getLogger("smashgo.api")
+frontend_dist = Path(__file__).resolve().parents[2] / "frontend" / "dist"
 
 
 @asynccontextmanager
@@ -188,3 +191,12 @@ def login(payload: LoginIn, request: Request):
         raise HTTPException(401, "Usuário ou senha inválidos")
     clear_login_attempts(ip)
     return {"access_token": create_token(), "token_type": "bearer", "expires_in": 28800}
+
+
+if frontend_dist.is_dir():
+    app.mount("/assets", StaticFiles(directory=frontend_dist / "assets"), name="frontend-assets")
+
+    @app.get("/", include_in_schema=False)
+    @app.get("/index.html", include_in_schema=False)
+    def frontend():
+        return FileResponse(frontend_dist / "index.html")

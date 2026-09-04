@@ -3,6 +3,11 @@
   "buildCommand": "npm run build --prefix frontend",
   "installCommand": "python -m pip install -r requirements.txt && npm install --prefix frontend",
   "outputDirectory": "frontend/dist",
+  "functions": {
+    "api/index.py": {
+      "includeFiles": "frontend/dist/**"
+    }
+  },
   "rewrites": [
     {
       "source": "/api/v1/:path*",
