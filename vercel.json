@@ -18,7 +18,7 @@
       "destination": "/api/index.py"
     },
     {
-      "source": "/((?!api/|health$).*)",
+      "source": "/((?!api/|assets/|health$).*)",
       "destination": "/index.html"
     }
   ]
