@@ -45,6 +45,7 @@ async def unexpected_error(request: Request, error: Exception):
 
 
 @app.get("/health")
+@app.get("/api/health")
 def health():
     return {"status": "ok"}
 
