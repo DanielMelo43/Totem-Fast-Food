@@ -20,7 +20,7 @@ services:
 
   backend:
     build:
-      context: ./backend
+      context: ./src/backend
     environment:
       APP_ENV: production
       DATABASE_URL: postgresql://${POSTGRES_USER:-smashgo}:${POSTGRES_PASSWORD}@database:5432/${POSTGRES_DB:-smashgo}
@@ -37,7 +37,7 @@ services:
 
   frontend:
     build:
-      context: ./frontend
+      context: ./src/frontend
     ports:
       - "${FRONTEND_PORT:-8080}:80"
     depends_on:

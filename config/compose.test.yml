@@ -1,0 +1,29 @@
+# Execute da raiz: docker compose -p smashgo-tests -f config/compose.test.yml up --build --abort-on-container-exit --exit-code-from tests
+services:
+  database:
+    image: postgres:17-bookworm
+    environment:
+      POSTGRES_DB: smashgo_test
+      POSTGRES_USER: smashgo_test
+      POSTGRES_PASSWORD: local-test-password
+    tmpfs:
+      - /var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U smashgo_test -d smashgo_test"]
+      interval: 2s
+      timeout: 5s
+      retries: 20
+  tests:
+    build:
+      context: ../src/backend
+    environment:
+      APP_ENV: development
+      DATABASE_URL: postgresql://smashgo_test:local-test-password@database:5432/smashgo_test
+      PYTHONPATH: /app
+    volumes:
+      - ../tests:/tests:ro
+    entrypoint: ["python", "-m", "pytest"]
+    command: ["-c", "/dev/null", "-o", "cache_dir=/tmp/pytest_cache", "/tests/backend", "-q"]
+    depends_on:
+      database:
+        condition: service_healthy

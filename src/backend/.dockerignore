@@ -5,6 +5,6 @@ tests
 data
 *.db
 *.log
-.env
+.env*
 especificacoes.pdf
 

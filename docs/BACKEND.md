@@ -1,19 +1,19 @@
 # SmashGo API
 
-API FastAPI com PostgreSQL para o totem existente em `frontend`. O catálogo é inicializado com os 12 produtos da interface e os preços são sempre recalculados no servidor.
+API FastAPI com PostgreSQL para o totem existente em `src/frontend`. O catálogo é inicializado com os 12 produtos da interface e os preços são sempre recalculados no servidor.
 
 ## Executar
 
 ```powershell
-cd backend
+cd src/backend
 python -m venv .venv
 .venv\Scripts\Activate.ps1
 pip install -r requirements.txt
-Copy-Item .env.example .env
-uvicorn app.main:app --reload
+if (-not (Test-Path .env)) { Copy-Item .env.example .env }
+uvicorn app.main:app --env-file .env --reload
 ```
 
-Variáveis do arquivo `.env` precisam ser exportadas no ambiente (ou use seu gerenciador de configuração). Em produção, altere obrigatoriamente `ADMIN_PASSWORD` e `CPF_ENCRYPTION_KEY`, preserve a chave de CPF em backup e restrinja `ALLOWED_ORIGINS`.
+O comando acima carrega explicitamente o `.env` local; variáveis já exportadas têm prioridade. Em produção, altere obrigatoriamente `ADMIN_PASSWORD` e `CPF_ENCRYPTION_KEY`, preserve a chave de CPF em backup e restrinja `ALLOWED_ORIGINS`.
 
 - API: `http://localhost:8000`
 - Swagger: `http://localhost:8000/docs`
@@ -37,11 +37,13 @@ Atualizações de pagamento/pedido são administrativas e exigem Bearer token ob
 
 ## Testes
 
+Configure DATABASE_URL para um PostgreSQL exclusivo de testes antes de executar; os testes gravam dados. Consulte o [README da raiz](../README.md#testes).
+
 ```powershell
-cd backend
-pytest -q
+# Na raiz do projeto
+src/backend/.venv/Scripts/python.exe -m pytest -c config/pytest.ini tests
 ```
 
 ## Docker
 
-As instruções para executar frontend e backend juntos estão em [`../DOCKER.md`](../DOCKER.md).
+As instruções para executar frontend e backend juntos estão em [`DOCKER.md`](DOCKER.md).
