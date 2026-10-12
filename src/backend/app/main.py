@@ -117,8 +117,8 @@ def create_order(payload: OrderIn):
 
         number = (db.execute("SELECT COALESCE(MAX(number), 0) + 1 AS next FROM orders").fetchone()["next"] - 1) % 999 + 1
         order_id = db.execute(
-            "INSERT INTO orders (customer_id, number, total_cents) VALUES (%s, %s, %s) RETURNING id",
-            (customer_id, number, total_cents),
+            "INSERT INTO orders (customer_id, number, total_cents) VALUES (%s, %s, %s::money) RETURNING id",
+            (customer_id, number, Decimal(total_cents) / 100),
         ).fetchone()["id"]
         with db.cursor() as cursor:
             cursor.executemany(
@@ -134,7 +134,10 @@ def create_order(payload: OrderIn):
 @app.get("/api/v1/orders/{order_id}")
 def get_order(order_id: int):
     with connect() as db:
-        order = db.execute("SELECT * FROM orders WHERE id = %s", (order_id,)).fetchone()
+        order = db.execute(
+            "SELECT *, total_cents::numeric AS total_amount FROM orders WHERE id = %s",
+            (order_id,),
+        ).fetchone()
         if not order:
             raise HTTPException(404, "Pedido não encontrado")
         items = db.execute(
@@ -151,7 +154,7 @@ def get_order(order_id: int):
         item_responses.append(item_data)
     return {
         "id": order["id"], "number": f"{order['number']:03d}", "status": order["status"],
-        "total": order["total_cents"] / 100, "created_at": order["created_at"],
+        "total": float(order["total_amount"]), "created_at": order["created_at"],
         "items": item_responses,
         "payment": dict(payment) if payment else None,
     }

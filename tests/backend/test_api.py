@@ -1,4 +1,6 @@
 import os
+from decimal import Decimal
+
 os.environ["ADMIN_PASSWORD"] = "test-password"
 os.environ["CPF_ENCRYPTION_KEY"] = "test-only-cpf-encryption-key-32-characters"
 
@@ -22,16 +24,23 @@ def test_catalog_order_and_payment():
 
         order_details = client.get(f"/api/v1/orders/{order.json()['id']}")
         assert order_details.status_code == 200
+        assert order_details.json()["total"] == 53.8
         assert order_details.json()["items"][0]["unit_price_cents"] == 2690
         assert order_details.json()["items"][0]["unit_price"] == 26.9
 
         with connect() as db:
-            column_type = db.execute(
+            column_types = db.execute(
                 "SELECT data_type FROM information_schema.columns "
-                "WHERE table_schema = current_schema() "
-                "AND table_name = 'order_items' AND column_name = 'unit_price_cents'"
-            ).fetchone()["data_type"]
-        assert column_type == "money"
+                "WHERE table_schema = current_schema() AND "
+                "((table_name = 'order_items' AND column_name = 'unit_price_cents') OR "
+                "(table_name = 'orders' AND column_name = 'total_cents'))"
+            ).fetchall()
+            total_amount = db.execute(
+                "SELECT total_cents::numeric AS amount FROM orders WHERE id = %s",
+                (order.json()["id"],),
+            ).fetchone()["amount"]
+        assert {row["data_type"] for row in column_types} == {"money"}
+        assert total_amount == Decimal("53.80")
 
         payment = client.post(f"/api/v1/orders/{order.json()['id']}/payments", json={"method": "pix"})
         assert payment.status_code == 201

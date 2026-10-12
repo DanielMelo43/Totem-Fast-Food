@@ -40,7 +40,7 @@ def initialize() -> None:
             CREATE TABLE IF NOT EXISTS orders (
                 id BIGSERIAL PRIMARY KEY, customer_id BIGINT NOT NULL REFERENCES customers(id),
                 number INTEGER NOT NULL, status TEXT NOT NULL DEFAULT 'pending_payment',
-                total_cents INTEGER NOT NULL CHECK(total_cents >= 0),
+                total_cents MONEY NOT NULL CHECK(total_cents >= 0::money),
                 created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
             );
             CREATE TABLE IF NOT EXISTS order_items (
@@ -73,6 +73,30 @@ def initialize() -> None:
                     USING (unit_price_cents::numeric / 100)::money;
                 ELSIF column_type IS DISTINCT FROM 'money' THEN
                     RAISE EXCEPTION 'Unexpected type for order_items.unit_price_cents: %', column_type;
+                END IF;
+            END;
+            $migration$;
+        """)
+        db.execute("""
+            DO $migration$
+            DECLARE
+                column_type TEXT;
+            BEGIN
+                SELECT data_type INTO column_type
+                FROM information_schema.columns
+                WHERE table_schema = current_schema()
+                  AND table_name = 'orders'
+                  AND column_name = 'total_cents';
+
+                IF column_type = 'integer' THEN
+                    ALTER TABLE orders DROP CONSTRAINT IF EXISTS orders_total_cents_check;
+                    ALTER TABLE orders
+                    ALTER COLUMN total_cents TYPE MONEY
+                    USING (total_cents::numeric / 100)::money;
+                    ALTER TABLE orders
+                    ADD CONSTRAINT orders_total_cents_check CHECK (total_cents >= 0::money);
+                ELSIF column_type IS DISTINCT FROM 'money' THEN
+                    RAISE EXCEPTION 'Unexpected type for orders.total_cents: %', column_type;
                 END IF;
             END;
             $migration$;
