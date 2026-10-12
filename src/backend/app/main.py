@@ -2,6 +2,7 @@ import logging
 import secrets
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
+from decimal import Decimal
 from pathlib import Path
 
 from fastapi import Depends, FastAPI, HTTPException, Query, Request
@@ -121,8 +122,11 @@ def create_order(payload: OrderIn):
         ).fetchone()["id"]
         with db.cursor() as cursor:
             cursor.executemany(
-                "INSERT INTO order_items (order_id,product_id,product_name,unit_price_cents,quantity,size,meat_point) VALUES (%s,%s,%s,%s,%s,%s,%s)",
-                [(order_id, product["id"], product["name"], price, item.quantity, item.size, item.meat_point) for product, item, price in priced_items],
+                "INSERT INTO order_items (order_id,product_id,product_name,unit_price_cents,quantity,size,meat_point) VALUES (%s,%s,%s,%s::money,%s,%s,%s)",
+                [
+                    (order_id, product["id"], product["name"], Decimal(price) / 100, item.quantity, item.size, item.meat_point)
+                    for product, item, price in priced_items
+                ],
             )
     return {"id": order_id, "number": f"{number:03d}", "status": "pending_payment", "total": total_cents / 100}
 
@@ -133,12 +137,22 @@ def get_order(order_id: int):
         order = db.execute("SELECT * FROM orders WHERE id = %s", (order_id,)).fetchone()
         if not order:
             raise HTTPException(404, "Pedido não encontrado")
-        items = db.execute("SELECT product_id,product_name,unit_price_cents,quantity,size,meat_point FROM order_items WHERE order_id = %s", (order_id,)).fetchall()
+        items = db.execute(
+            "SELECT product_id,product_name,unit_price_cents::numeric AS unit_price_cents,quantity,size,meat_point FROM order_items WHERE order_id = %s",
+            (order_id,),
+        ).fetchall()
         payment = db.execute("SELECT method,status,pix_code FROM payments WHERE order_id = %s", (order_id,)).fetchone()
+    item_responses = []
+    for item in items:
+        item_data = dict(item)
+        item_amount = item_data["unit_price_cents"]
+        item_data["unit_price_cents"] = int(item_amount * 100)
+        item_data["unit_price"] = float(item_amount)
+        item_responses.append(item_data)
     return {
         "id": order["id"], "number": f"{order['number']:03d}", "status": order["status"],
         "total": order["total_cents"] / 100, "created_at": order["created_at"],
-        "items": [{**dict(item), "unit_price": item["unit_price_cents"] / 100} for item in items],
+        "items": item_responses,
         "payment": dict(payment) if payment else None,
     }
 

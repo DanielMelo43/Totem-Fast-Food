@@ -20,6 +20,19 @@ def test_catalog_order_and_payment():
         assert order.status_code == 201
         assert order.json()["total"] == 53.8
 
+        order_details = client.get(f"/api/v1/orders/{order.json()['id']}")
+        assert order_details.status_code == 200
+        assert order_details.json()["items"][0]["unit_price_cents"] == 2690
+        assert order_details.json()["items"][0]["unit_price"] == 26.9
+
+        with connect() as db:
+            column_type = db.execute(
+                "SELECT data_type FROM information_schema.columns "
+                "WHERE table_schema = current_schema() "
+                "AND table_name = 'order_items' AND column_name = 'unit_price_cents'"
+            ).fetchone()["data_type"]
+        assert column_type == "money"
+
         payment = client.post(f"/api/v1/orders/{order.json()['id']}/payments", json={"method": "pix"})
         assert payment.status_code == 201
         assert payment.json()["pix_code"]

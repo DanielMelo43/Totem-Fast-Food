@@ -46,7 +46,7 @@ def initialize() -> None:
             CREATE TABLE IF NOT EXISTS order_items (
                 id BIGSERIAL PRIMARY KEY, order_id BIGINT NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
                 product_id BIGINT NOT NULL REFERENCES products(id), product_name TEXT NOT NULL,
-                unit_price_cents INTEGER NOT NULL, quantity INTEGER NOT NULL CHECK(quantity BETWEEN 1 AND 99),
+                unit_price_cents MONEY NOT NULL, quantity INTEGER NOT NULL CHECK(quantity BETWEEN 1 AND 99),
                 size TEXT, meat_point TEXT
             );
             CREATE TABLE IF NOT EXISTS payments (
@@ -55,6 +55,27 @@ def initialize() -> None:
                 created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP, paid_at TIMESTAMPTZ
             );
             CREATE TABLE IF NOT EXISTS auth_tokens (token_hash TEXT PRIMARY KEY, expires_at BIGINT NOT NULL);
+        """)
+        db.execute("""
+            DO $migration$
+            DECLARE
+                column_type TEXT;
+            BEGIN
+                SELECT data_type INTO column_type
+                FROM information_schema.columns
+                WHERE table_schema = current_schema()
+                  AND table_name = 'order_items'
+                  AND column_name = 'unit_price_cents';
+
+                IF column_type = 'integer' THEN
+                    ALTER TABLE order_items
+                    ALTER COLUMN unit_price_cents TYPE MONEY
+                    USING (unit_price_cents::numeric / 100)::money;
+                ELSIF column_type IS DISTINCT FROM 'money' THEN
+                    RAISE EXCEPTION 'Unexpected type for order_items.unit_price_cents: %', column_type;
+                END IF;
+            END;
+            $migration$;
         """)
         db.execute("ALTER TABLE customers ADD COLUMN IF NOT EXISTS cpf_hash TEXT")
         customers = db.execute("SELECT id, cpf, cpf_hash FROM customers").fetchall()
